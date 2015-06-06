@@ -1,0 +1,68 @@
+## civic hack
+DCE "new" data is from May 2014 to May 2015. Multifamily, nonresidential, new 1 or 2 family.
+
+DCE violations data. Similar dates. Weeds and grass (high weeds and grass, mowing etc..), vehicle (upon introspection found two inoperable vehicle on property, BLACK PONTIAC GRAND AM WITH EXPIRED LICENSE TAGS AND FLAT TIRES FRONT LEFT AND REAR TIRES, not all entries give description), trash (pile of tires, mattress in alley etc..)  and graffiti. These are by street names. 
+
+The IndianaDwelling.txt file contains property values. We need Assessment_Year
+```{r}
+setwd("C:/Users/owner/documents/civicHack/CityChallenge1")
+propVal <- read.table("IndianaDwelling.txt", header = TRUE, sep = ",")
+colnames(propVal)
+indImp <- read.table("IndianaImprove.txt", header = TRUE, sep = ",")
+indPar <- read.table("IndianaParcel.txt", header = TRUE, sep = ",")
+```
+
+```{r}
+data <- read.csv("FinalData.csv")
+colnames(data)[4] <- "address"
+data$address <- as.character(data$address)
+for (i in 1:4){
+  data[ , i] <- rev(data[,i])  
+}
+
+data <- data[!duplicated(data$address), ]
+latLong <- data.frame("lon" = numeric(nrow(data)), "lat" = numeric(nrow(data)))
+for (i in 1:nrow(data)){
+  print(i)
+  if (data$address[i] != "-1"){
+    latLong[i, ] <- geocode(data[i,4])  
+  } else {
+    latLong[i, ] <- c(NA, NA)  
+  }
+}
+
+temp <- latLong[!is.na(latLong$lat),]
+
+write.csv(data, "finalDataLatLon.csv", row.names = FALSE)
+write.csv(temp, "finalDataSub.csv", row.names = FALSE)
+
+devtools::install_github("rstudio/leaflet")
+
+colnames(temp)[3] <- "val"
+temp <- data[!is.na(data$lat), ]
+temp <- temp[!is.na(temp$val), ]
+summary(temp$val)
+temp1 <- temp[temp$val > -28000 , ]
+temp2 <- temp[temp$val <= -28000 , ]
+
+write.csv(temp1, "temp1.csv", row.names = FALSE)
+write.csv(temp2, "temp2.csv", row.names = FALSE)
+
+pal2 <- colorQuantile(
+  palette = "Reds",
+  domain = temp2$val
+)
+
+pal1 <- colorQuantile(
+  palette = "Greens",
+  domain = temp1$val
+)
+
+leaflet() %>% addTiles() %>% setView(lng = -86.31, lat = 39.8, zoom = 12) %>%
+  addCircles(lng = temp2$lon, lat = temp2$lat, weight = 1,
+    radius = 100, stroke = FALSE, color = pal2(temp2$val)
+  ) %>%
+  addCircles(lng = temp1$lon, lat = temp1$lat, weight = 1,
+    radius = 100, stroke = FALSE, color = pal1(temp1$val)
+  )
+```
